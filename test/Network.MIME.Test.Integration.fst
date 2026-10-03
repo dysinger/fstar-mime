@@ -8,6 +8,8 @@ If any lemma or test function is deleted or renamed, F* verification fails.
 This guarantees mechanically-enforced test coverage.
 
 Uses [--admit_smt_queries true] for integration anchoring only.
+Every binding below is a bare `let _ = f` value reference, which generates
+no verification conditions (no roundtrip or logical claim is re-proven here).
 Individual lemmas are proven without admits in their source modules.
 
 @header Network.MIME.Test.Integration

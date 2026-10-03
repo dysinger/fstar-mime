@@ -30,6 +30,16 @@ The C-extractable content-type tag dispatch leaf lives in [Network.MIME.Pulse].
   `image__*`, `audio__*`, `video__*`, `multipart__*`, `font__*`, `message__*`,
   `model__*`).
 
+@section Identifier escaping
+- Each registry constant is named `type__subtype` (the `/` separator becomes
+  `__`).  Within [subtype], the IANA registry characters are escaped to valid
+  F* identifiers: `-` becomes `_`; `+` becomes `_plus_` (so `amr-wb+` →
+  `amr_wb_plus_`, trailing `+` yielding a trailing `_plus_`); a leading digit
+  is prefixed with `_` (so `1d-interleaved-parityfec` →
+  `_1d_interleaved_parityfec`, giving `application__1d_...` = `application` +
+  `__` separator + `_1d_...`).  The `__` token is therefore overloaded: it is
+  the type/subtype separator AND the leading-digit escape prefix.
+
 @section Codec
 - [token_codec] — one-or-more RFC 2045 token chars ([codec (list byte)])
 - [mime_bytes_codec] — `type "/" subtype` over the bytes-level mirror
