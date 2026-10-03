@@ -18,7 +18,7 @@ Written for F* v2026.09.20 (Custard `--custard_backend C`).  Zero admits.
 
 @section Type
 - [content_type] — the enumerated content-type subset
-- [opt_content_type] — the tagged decode result
+- [opt_content_type] — the tagged decode result ([OCO_None] (unreachable) | [OCO_Some] of ([content_type] & [U32.t]))
 
 @section Spec
 - [tag_of] / [tag_to_type] — the pure tag byte ↔ content-type maps
@@ -27,7 +27,7 @@ Written for F* v2026.09.20 (Custard `--custard_backend C`).  Zero admits.
 - [encode_content_type] — writes the 1-byte tag, returns [1ul]
 
 @section Decode
-- [decode_content_type] — reads the 1-byte tag, returns [OCO_Some]
+- [decode_content_type] — reads the 1-byte tag, returns ([content_type], [1ul])
 
 @section Roundtrip
 - [lemma_tag_roundtrip] — the pure spec roundtrip
@@ -65,7 +65,14 @@ type content_type =
 
 
 (** [opt_content_type] — the decode result: [OCO_None] (never, under the bounds
-    precondition) or [OCO_Some] of ([content_type] & [U32.t]). *)
+    precondition) or [OCO_Some] of ([content_type] & [U32.t]).
+
+    [OCO_None] is constructively unreachable — the 1-byte read under a bounds
+    precondition always succeeds, and [decode_content_type]'s body returns only
+    [OCO_Some] — but it is REQUIRED for extraction: Custard's F# backend has no
+    realization for a bare [tuple2] (`content_type & U32.t`), so the pair must
+    be wrapped in a (multi-constructor) sum.  Do NOT delete [OCO_None] without
+    an F# realization for the pair. *)
 type opt_content_type =
   | OCO_None
   | OCO_Some of (content_type & U32.t)

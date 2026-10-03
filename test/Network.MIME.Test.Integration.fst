@@ -35,6 +35,42 @@ let _application_json = application_json
 let _image_png = image_png
 
 
+(** Scanner + codec functions — protected against deletion *)
+
+
+(** [is_token_char] *)
+let _is_token_char = is_token_char
+(** [token_run_scan] *)
+let _token_run_scan = token_run_scan
+(** [token_run_wfcv] *)
+let _token_run_wfcv = token_run_wfcv
+(** [mime_bytes_enc] *)
+let _mime_bytes_enc = mime_bytes_enc
+(** [mime_bytes_dec] *)
+let _mime_bytes_dec = mime_bytes_dec
+
+
+(** ASCII bridges + bytes↔mime + public API — protected against deletion *)
+
+
+(** [ascii_bytes_to_string] *)
+let _ascii_bytes_to_string = ascii_bytes_to_string
+(** [string_to_ascii_bytes] *)
+let _string_to_ascii_bytes = string_to_ascii_bytes
+(** [mime_of_bytes] *)
+let _mime_of_bytes = mime_of_bytes
+(** [mime_to_bytes] *)
+let _mime_to_bytes = mime_to_bytes
+(** [encode_mime] *)
+let _encode_mime = encode_mime
+(** [decode_mime] *)
+let _decode_mime = decode_mime
+(** [string_of_mime] *)
+let _string_of_mime = string_of_mime
+(** [mime_of_string] *)
+let _mime_of_string = mime_of_string
+
+
 (** Token / codec lemmas *)
 
 
@@ -75,6 +111,11 @@ let _lemma_pulse_content_type_roundtrip = lemma_pulse_content_type_roundtrip
 let _encode_content_type = encode_content_type
 (** [decode_content_type] *)
 let _decode_content_type = decode_content_type
+
+
+(* The Pulse spec mirrors [tag_of]/[tag_to_type] are [noextract]; they are
+   transitively covered by [lemma_tag_roundtrip] (bound above), the same
+   policy as [fstar-basen]/[fstar-uuid]. *)
 
 
 #pop-options

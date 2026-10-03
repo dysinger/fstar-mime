@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(no unreleased changes)
+
+## [0.1.0] — initial extraction
+
+### Added
+
+- Extracted `Network.MIME` out of the original monorepo into a standalone
+  repository built from `fstar-nix-flake-template`.
+- Source modules:
+  - `Network.MIME` — the `mime` record, the IANA media-type registry
+    enumeration (2280 constants, case-preserving per IANA), and the
+    `type "/" subtype` codec (RFC 2045 §5.1).
+  - `Network.MIME.Pulse` — C-extractable 1-byte content-type tag dispatch.
+- Test module: `Network.MIME.Test.Integration`.
+- Nix flake targets: `.#checked`, `.#ocaml`, `.#native`, `.#fsharp`.
+- Dual licensing: AGPL-3.0-or-later, or a commercial license from the author.
+
 ### Changed
 
 - Renamed the C leaf `Network.MIME.Low` → `Network.MIME.Pulse` (the KaRaMeL
@@ -26,28 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the KaRaMeL/Low\* toolchain and all its targets (`krml`, `native`,
   `rust`, `wasm`) — F\* `v2026.09.20` deleted the `FStar.HyperStack` /
   `LowStar.Buffer` stdlib.
-
-### Source drift fixes
-
 - Defined the ASCII `bytes ↔ string` bridges locally (they were unbound, and
   the dead `open Data.Text.Codec.UTF8` was removed).
+
+### Fixed
+
 - Removed `open FStar.Mul` and `Prims.op_Multiply` (both deleted upstream).
 - Removed `--split_queries always` from `#push-options` (option deleted).
-
-## [0.1.0] — initial extraction
-
-### Added
-
-- Extracted `Network.MIME` out of the original monorepo into a standalone
-  repository built from `fstar-nix-flake-template`.
-- Source modules:
-  - `Network.MIME` — the `mime` record, the IANA media-type registry
-    enumeration (2280 constants), and the `type "/" subtype` codec (RFC 2045
-    §5.1).
-  - `Network.MIME.Pulse` — C-extractable 1-byte content-type tag dispatch.
-- Test module: `Network.MIME.Test.Integration`.
-- Nix flake targets: `.#checked`, `.#ocaml`, `.#native`, `.#fsharp`.
-- Dual licensing: AGPL-3.0-or-later, or a commercial license from the author.
 
 ### Notes
 

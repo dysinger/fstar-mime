@@ -58,8 +58,11 @@ module Seq = FStar.Seq
 (* ── Types ──────────────────────────────────────────────────────────── *)
 
 
-(** A MIME media type: a `type` and `subtype`, both non-empty token strings,
-    case-insensitive per RFC 2045 but stored lowercase (RFC 2045 §5.1). *)
+(** A MIME media type: a `type` and `subtype`, both non-empty token strings.
+    Case-INSENSITIVE for matching per RFC 2045 §5.1, but stored
+    CASE-PRESERVING (the IANA registry constants keep their authoritative
+    casing, e.g. `application/3gppHal+json`); a parser may downcase for
+    canonical comparison. *)
 type mime = {
   type_    : string;
   subtype  : string;
@@ -2376,8 +2379,6 @@ let video_vnd_dot_vivo : mime = {type_ = "video"; subtype = "vnd.vivo"}
 let video_vp8 : mime = {type_ = "video"; subtype = "VP8"}
 let video_vp9 : mime = {type_ = "video"; subtype = "VP9"}
 
-(* Total: 2280 MIME types from IANA registry *)
-
 (* ========================================================================
    MIME Codec
    ======================================================================== *)
@@ -2387,7 +2388,9 @@ let video_vp9 : mime = {type_ = "video"; subtype = "VP9"}
 
 
 (** [is_token_char] — RFC 2045 §5.1 token character predicate.
-    Accept: `A-Z a-z 0-9` and `! # $ % & ' * + - . ^ _ ` { | } ~`. *)
+    Accept: `A-Z a-z 0-9` and `! # $ % & ' * + - . ^ _ ` { | } ~`.
+    The `/` (0x2F) separator is deliberately NOT accepted — it delimits
+    [type_]/[subtype] and never appears inside a token. *)
 let is_token_char (b: U8.t) : bool =
   let v = U8.v b in
   (0x41 <= v && v <= 0x5A) || (0x61 <= v && v <= 0x7A) || (0x30 <= v && v <= 0x39) ||
@@ -2468,7 +2471,6 @@ let mime_bytes_dec (input: list byte) : option (mime_bytes & nat) =
 
 (** [lemma_mime_bytes_roundtrip] — the bytes-level roundtrip: decoding the
     encoding of [mb] reconstructs [mb] and consumes the whole encoding. *)
-#push-options "--z3rlimit 400"
 let lemma_mime_bytes_roundtrip (mb: mime_bytes) : Lemma
   (requires token_run_wfcv mb.type_bytes /\ token_run_wfcv mb.subtype_bytes)
   (ensures mime_bytes_dec (mime_bytes_enc mb) == Some (mb, List.Tot.length (mime_bytes_enc mb)))
@@ -2487,7 +2489,6 @@ let lemma_mime_bytes_roundtrip (mb: mime_bytes) : Lemma
   let (t, rest) = token_run_scan enc in
   assert (t == ty /\ rest == 0x2Fuy :: su);
   ()
-#pop-options
 
 
 (* ── string ↔ bytes bridges (local ASCII) ──────────────────────────── *)
