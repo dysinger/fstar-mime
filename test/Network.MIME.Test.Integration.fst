@@ -42,8 +42,10 @@ let _image_png = image_png
 
 (** [is_token_char] *)
 let _is_token_char = is_token_char
-(** [token_run_scan] *)
-let _token_run_scan = token_run_scan
+(** [token_codec] *)
+let _token_codec = token_codec
+(** [mime_bytes_codec] *)
+let _mime_bytes_codec = mime_bytes_codec
 (** [token_run_wfcv] *)
 let _token_run_wfcv = token_run_wfcv
 (** [mime_bytes_enc] *)
@@ -76,10 +78,6 @@ let _mime_of_string = mime_of_string
 (** Token / codec lemmas *)
 
 
-(** [lemma_token_run_wfcv_nonempty] *)
-let _lemma_token_run_wfcv_nonempty = lemma_token_run_wfcv_nonempty
-(** [lemma_token_run_scan_self] *)
-let _lemma_token_run_scan_self = lemma_token_run_scan_self
 (** [lemma_mime_bytes_roundtrip] *)
 let _lemma_mime_bytes_roundtrip = lemma_mime_bytes_roundtrip
 

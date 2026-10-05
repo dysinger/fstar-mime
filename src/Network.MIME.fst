@@ -2409,96 +2409,65 @@ let is_token_char (b: U8.t) : bool =
   v = 0x60 || v = 0x7B || v = 0x7C || v = 0x7D || v = 0x7E
 
 
-(** [token_run_scan] — scan a maximal run of token chars from the head of a
-    byte list.  Returns [(run, rest)] where [run] is non-empty iff the input
-    begins with a token char, and [rest] is the (possibly empty) remainder. *)
-let rec token_run_scan (bs: list byte) : Tot (list byte & list byte) (decreases bs) =
-  match bs with
-  | [] -> ([], [])
-  | b :: tl ->
-    if is_token_char b then
-      let (run, rest) = token_run_scan tl in (b :: run, rest)
-    else ([], bs)
-
-
 (** [token_run_wfcv] — a token run is well-formed iff it is non-empty and every
-    byte is a token char (an explicit recursion so SMT unfolds it directly). *)
-let rec token_run_wfcv (bs: list byte) : Tot bool (decreases bs) =
-  match bs with
-  | [] -> false
-  | b :: tl -> is_token_char b && token_run_wfcv tl
+    byte is a token char.  A boolean mirror of [token_codec]'s [wfcv] (i.e.
+    [satisfy_many1]'s `Cons? && for_all`), kept so the roundtrip lemmas read in
+    domain terms.  NOT a parser — it is the well-formedness predicate only. *)
+let token_run_wfcv (bs: list byte) : Tot bool =
+  Cons? bs && FStar.List.Tot.for_all is_token_char bs
 
 
-(** [lemma_token_run_wfcv_nonempty] — a well-formed token run is non-empty. *)
-let lemma_token_run_wfcv_nonempty (bs: list byte) : Lemma
-  (requires token_run_wfcv bs)
-  (ensures Cons? bs)
-  = match bs with
-    | [] -> ()
-    | _ :: _ -> ()
+(** [token_codec] — one-or-more RFC 2045 token chars, as a [codec (list byte)].
 
-
-(** [lemma_token_run_scan_self] — scanning a well-formed token run [bs] followed
-    by a [rest] that does not begin with a token char returns exactly
-    [(bs, rest)]. *)
-let rec lemma_token_run_scan_self (bs: list byte) (rest: list byte) : Lemma
-  (requires
-    token_run_wfcv bs /\
-    (match rest with [] -> True | b :: _ -> not (is_token_char b)))
-  (ensures token_run_scan (bs @ rest) == (bs, rest))
-  (decreases bs) =
-  match bs with
-  | [] -> ()
-  | b :: tl ->
-    lemma_token_run_scan_self tl rest;
-    ()
+    Built from [satisfy_many1 is_token_char]: a non-empty run of token chars.
+    The `/` (0x2F) separator is deliberately not a token char, so a run always
+    stops exactly at the type/subtype boundary. *)
+let token_codec : codec (list byte) = satisfy_many1 is_token_char
 
 
 (* ── bytes-level codec (type "/" subtype) ──────────────────────────── *)
 
 
-(** [mime_bytes_enc] — serialize the bytes-level mirror to its byte list:
-    `type / subtype` (the `/` is [0x2F]). *)
+(** [mime_bytes_codec] — `type "/" subtype` over the bytes-level mirror, as a
+    [codec mime_bytes].
+
+    Built from the combinators: [product] of [token_codec] (the [type]),
+    [byte_val 0x2Fuy] (the `/`), and [token_codec] (the [subtype]), then
+    [map_]ped into [mime_bytes].  The well-formedness guard is the conjunction
+    of both token runs (non-empty + all token chars), which is exactly
+    [satisfy_many1]'s [wfcv]. *)
+let mime_bytes_codec : codec mime_bytes =
+  map_
+    (fun (((t, _), s) : (list byte & unit) & list byte) ->
+      if Cons? t && Cons? s
+      then Some ({ type_bytes = t; subtype_bytes = s })
+      else None)
+    (fun (mb: mime_bytes) ->
+      Some ((mb.type_bytes, ()), mb.subtype_bytes))
+    (product (product token_codec (byte_val 0x2Fuy)) token_codec)
+
+
+(** [mime_bytes_enc] — serialize the bytes-level mirror to its byte list
+    (`type / subtype`) via [mime_bytes_codec.enc]. *)
 let mime_bytes_enc (mb: mime_bytes) : list byte =
-  mb.type_bytes @ (0x2Fuy :: mb.subtype_bytes)
+  Seq.seq_to_list (mime_bytes_codec.enc mb)
 
 
-(** [mime_bytes_dec] — parse `type "/" subtype` from a byte list into the
-    bytes-level mirror, returning the consumed length.  [None] on any
-    malformed input (empty type, missing `/`, or empty subtype). *)
+(** [mime_bytes_dec] — parse `type "/" subtype` via [mime_bytes_codec.dec],
+    returning the consumed length.  [None] on malformed input. *)
 let mime_bytes_dec (input: list byte) : option (mime_bytes & nat) =
-  let (t, rest) = token_run_scan input in
-  match rest with
-  | 0x2Fuy :: rest' ->
-    if Cons? t then
-      let (sub, rest'') = token_run_scan rest' in
-      if Cons? sub then
-        Some ({ type_bytes = t; subtype_bytes = sub }, List.Tot.length t + 1 + List.Tot.length sub)
-      else None
-    else None
-  | _ -> None
+  match mime_bytes_codec.dec (Seq.seq_of_list input) with
+  | Inr (mb, consumed) -> Some (mb, consumed)
+  | Inl _ -> None
 
 
-(** [lemma_mime_bytes_roundtrip] — the bytes-level roundtrip: decoding the
-    encoding of [mb] reconstructs [mb] and consumes the whole encoding. *)
+(** [lemma_mime_bytes_roundtrip] — the bytes-level roundtrip, via the generic
+    [mime_bytes_codec.roundtrip] (no bespoke scanner). *)
 let lemma_mime_bytes_roundtrip (mb: mime_bytes) : Lemma
   (requires token_run_wfcv mb.type_bytes /\ token_run_wfcv mb.subtype_bytes)
-  (ensures mime_bytes_dec (mime_bytes_enc mb) == Some (mb, List.Tot.length (mime_bytes_enc mb)))
-  =
-  let ty = mb.type_bytes in
-  let su = mb.subtype_bytes in
-  let enc = ty @ (0x2Fuy :: su) in
-  lemma_token_run_wfcv_nonempty ty;
-  lemma_token_run_wfcv_nonempty su;
-  assert (not (is_token_char 0x2Fuy));
-  lemma_token_run_scan_self ty (0x2Fuy :: su);
-  lemma_token_run_scan_self su [];
-  assert (token_run_scan (ty @ (0x2Fuy :: su)) == (ty, 0x2Fuy :: su));
-  assert (token_run_scan su == (su, []));
-  List.Tot.append_length ty (0x2Fuy :: su);
-  let (t, rest) = token_run_scan enc in
-  assert (t == ty /\ rest == 0x2Fuy :: su);
-  ()
+  (ensures mime_bytes_codec.dec (mime_bytes_codec.enc mb `Seq.append` Seq.empty)
+           == Inr (mb, Seq.length (mime_bytes_codec.enc mb)))
+  = mime_bytes_codec.roundtrip mb Seq.empty
 
 
 (* ── string ↔ bytes bridges (local ASCII) ──────────────────────────── *)
@@ -2562,35 +2531,58 @@ let mime_of_string (s: string) : GTot (option mime) =
 (* ── Lemmas ─────────────────────────────────────────────────────────── *)
 
 
-(** [lemma_mime_bytes_text_plain_concrete] — the concrete byte vector
-    `"text/plain"` decodes to the expected bytes-level mirror. *)
+(** [lemma_create_is_singleton] — [Seq.create 1 b] is the singleton [b].
+    (Local [Seq]-level bridge so the encoder reduces.) *)
+let lemma_create_is_singleton (b: byte) : Lemma
+  (ensures Seq.create 1 b == seq_of_list [b])
+  = Seq.lemma_eq_intro (Seq.create 1 b) (seq_of_list [b])
+
+
+(** [lemma_mime_bytes_text_plain_concrete] — encoding [text/plain] produces the
+    exact `type "/" subtype` byte list. *)
 let lemma_mime_bytes_text_plain_concrete () : Lemma
   (ensures
-    mime_bytes_dec [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy]
-    == Some ({ type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
-             ; subtype_bytes = [0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy] }, 10))
-  = ()
+    mime_bytes_enc { type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
+                   ; subtype_bytes = [0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy] }
+    == [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy])
+  = Seq.lemma_eq_intro
+      (mime_bytes_codec.enc { type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
+                            ; subtype_bytes = [0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy] })
+      (seq_of_list [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy]);
+    ()
 
 
-(** [lemma_mime_bytes_text_html_concrete] — the concrete byte vector
-    `"text/html"` decodes to the expected bytes-level mirror. *)
+(** [lemma_mime_bytes_text_html_concrete] — encoding [text/html] produces the
+    exact `type "/" subtype` byte list. *)
 let lemma_mime_bytes_text_html_concrete () : Lemma
   (ensures
-    mime_bytes_dec [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x68uy;0x74uy;0x6Duy;0x6Cuy]
-    == Some ({ type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
-             ; subtype_bytes = [0x68uy;0x74uy;0x6Duy;0x6Cuy] }, 9))
-  = ()
+    mime_bytes_enc { type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
+                   ; subtype_bytes = [0x68uy;0x74uy;0x6Duy;0x6Cuy] }
+    == [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x68uy;0x74uy;0x6Duy;0x6Cuy])
+  = Seq.lemma_eq_intro
+      (mime_bytes_codec.enc { type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]
+                            ; subtype_bytes = [0x68uy;0x74uy;0x6Duy;0x6Cuy] })
+      (seq_of_list [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy;0x68uy;0x74uy;0x6Duy;0x6Cuy]);
+    ()
 
 
-(** [lemma_mime_bytes_reject_empty_type] — a missing [type] (`"/plain"`) is
-    rejected. *)
+(** [lemma_mime_bytes_reject_empty_type] — the codec's well-formedness guard
+    is false for a missing [type] (`"/plain"`): the empty leading token run
+    fails [mime_bytes_codec.wfcv]. *)
 let lemma_mime_bytes_reject_empty_type () : Lemma
-  (ensures mime_bytes_dec [0x2Fuy;0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy] == None)
+  (ensures
+    (match mime_bytes_codec.wfcv { type_bytes = []; subtype_bytes = [0x70uy;0x6Cuy;0x61uy;0x69uy;0x6Euy] } with
+     | true -> False
+     | false -> True))
   = ()
 
 
-(** [lemma_mime_bytes_reject_empty_subtype] — a missing [subtype]
-    (`"text/"`) is rejected. *)
+(** [lemma_mime_bytes_reject_empty_subtype] — the codec's well-formedness guard
+    is false for a missing [subtype] (`"text/"`): the empty trailing token run
+    fails [mime_bytes_codec.wfcv]. *)
 let lemma_mime_bytes_reject_empty_subtype () : Lemma
-  (ensures mime_bytes_dec [0x74uy;0x65uy;0x78uy;0x74uy;0x2Fuy] == None)
+  (ensures
+    (match mime_bytes_codec.wfcv { type_bytes = [0x74uy;0x65uy;0x78uy;0x74uy]; subtype_bytes = [] } with
+     | true -> False
+     | false -> True))
   = ()

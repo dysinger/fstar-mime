@@ -29,13 +29,14 @@
 |----------|-----------|-------------|
 | `text_plain`, `text_html`, `application_json`, `image_png`, … | `mime` | 2280 IANA media-type constants (9 `*_` prefixes) |
 
-## Char predicate + scan
+## Char predicate + codec
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `is_token_char` | `U8.t -> bool` | RFC 2045 §5.1 token-char predicate |
-| `token_run_scan` | `list byte -> list byte & list byte` | maximal leading token-char run |
-| `token_run_wfcv` | `list byte -> bool` | non-empty + all-token-char guard |
+| `token_codec` | `codec (list byte)` | non-empty token run (`satisfy_many1 is_token_char`) |
+| `token_run_wfcv` | `list byte -> bool` | non-empty + all-token-char guard (wfcv mirror) |
+| `mime_bytes_codec` | `codec mime_bytes` | `type "/" subtype` over the bytes mirror |
 
 ## Pulse leaf
 
@@ -50,9 +51,7 @@
 
 | Lemma | Proves |
 |-------|--------|
-| `lemma_token_run_wfcv_nonempty` | a well-formed token run is non-empty |
-| `lemma_token_run_scan_self` | scanning a token run + non-token suffix returns `(run, rest)` |
-| `lemma_mime_bytes_roundtrip` | `decode (encode mb) == Some (mb, \|encode mb\|)` |
+| `lemma_mime_bytes_roundtrip` | `decode (encode mb) == Some (mb, \|encode mb\|)` (via `mime_bytes_codec.roundtrip`) |
 | `lemma_mime_bytes_text_plain_concrete` | `"text/plain"` byte vector decodes correctly |
 | `lemma_mime_bytes_text_html_concrete` | `"text/html"` byte vector decodes correctly |
 | `lemma_mime_bytes_reject_empty_type` | a missing `type` (`"/plain"`) is rejected |

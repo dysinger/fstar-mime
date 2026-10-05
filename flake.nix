@@ -15,9 +15,11 @@
       flake = false;
     };
     # The codec dependency (Data.Codec.Types).  Consumed from the published
-    # `dysinger/fstar-codec` GitHub repo (pinned to its HEAD commit in
-    # flake.lock).
-    fstar-codec.url = "github:dysinger/fstar-codec";
+    # `dysinger/fstar-codec` GitHub repo, pinned to the commit that ships the
+    # variable-width `satisfy_many0`/`satisfy_many1` predicate-run combinators
+    # AND the `take_until` delimiter-bounded `codec (list byte)` (the Mandate 22
+    # root-cause fix; MIME's token runs need `satisfy_many1`).
+    fstar-codec.url = "github:dysinger/fstar-codec/17ce56442de119614103086e9706690e6bd03e41";
   };
 
   outputs =
