@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(no unreleased changes)
+### Changed
+
+- Re-expressed the MIME token-run and `type/subtype` form over the codec
+  combinators (`token_codec = satisfy_many1 is_token_char`,
+  `mime_bytes_codec = product (product token_codec (byte_val 0x2Fuy))
+  token_codec`); deleted the bespoke `token_run_scan`/`token_run_wfcv`/
+  `mime_bytes_enc`/`mime_bytes_dec` scanners (Mandate 22).  The roundtrip is
+  proven 0-admit via the codec `.roundtrip`.
 
 ## [0.1.0] — initial extraction
 
